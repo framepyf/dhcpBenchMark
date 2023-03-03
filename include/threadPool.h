@@ -4,20 +4,35 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include "include/log.h"
+
 
 #define LL_ADD(item, list) do { 	\
-	item->prev = NULL;				\
-	item->next = list;				\
-	list = item;					\
+    if(list != NULL) { \
+		list->prev->next = item ; \
+		item->prev = list->prev ; \
+		item->next = list ; \
+		list->prev = item; \
+	 } \
+	 else {    \
+		 list = item->next = item->prev = item ; \
+	 } \
 } while(0)
 
 #define LL_REMOVE(item, list) do {						\
-	if (item->prev != NULL) item->prev->next = item->next;	\
-	if (item->next != NULL) item->next->prev = item->prev;	\
-	if (list == item) list = item->next;					\
+    if(item == item->next) { \
+	    list = NULL; \
+	} else {    \
+	   item->prev->next = item->next;	\
+	   item->next->prev = item->prev;	\
+	   if(list == item) list = item->next ; \
+	} \
 	item->prev = item->next = NULL;							\
 } while(0)
 
+struct NJOB;
+
+typedef void (*task_cb)(struct NJOB *job);
 
 typedef struct NWORKER {
 	pthread_t thread;
@@ -28,7 +43,7 @@ typedef struct NWORKER {
 } nWorker;
 
 typedef struct NJOB {
-	void (*job_function)(struct NJOB *job);
+	task_cb job_function;
 	void *user_data;
 	struct NJOB *prev;
 	struct NJOB *next;
@@ -42,6 +57,7 @@ typedef struct NWORKQUEUE {
 } nWorkQueue;
 
 typedef nWorkQueue nThreadPool;
+
 
 extern int  threadPoolCreate(nThreadPool *workqueue, int numWorkers);
 extern void threadPoolShutdown(nThreadPool *workqueue); 

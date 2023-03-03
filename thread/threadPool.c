@@ -1,5 +1,21 @@
 
-#include "threadPool.h"
+#include "include/threadPool.h"
+#include "include/log.h"
+
+
+void threadPoolQueue(nThreadPool *workqueue, nJob *job) 
+{
+
+	pthread_mutex_lock(&workqueue->jobs_mtx);
+
+	LL_ADD(job, workqueue->waiting_jobs);
+	
+	pthread_cond_signal(&workqueue->jobs_cond);
+	pthread_mutex_unlock(&workqueue->jobs_mtx);
+	
+}
+
+
 
 
 static void * workerThread(void *ptr) {
@@ -51,7 +67,7 @@ int threadPoolCreate(nThreadPool *workqueue, int numWorkers) {
 	for (i = 0;i < numWorkers;i ++) {
 		nWorker *worker = (nWorker*)malloc(sizeof(nWorker));
 		if (worker == NULL) {
-			perror("malloc");
+			DHCP_LOG_ERROR("malloc failed");
 			return 1;
 		}
 
@@ -61,7 +77,7 @@ int threadPoolCreate(nThreadPool *workqueue, int numWorkers) {
 		int ret = pthread_create(&worker->thread, NULL, workerThread, (void *)worker);
 		if (ret) {
 			
-			perror("pthread_create");
+			DHCP_LOG_ERROR("pthread_create failed");
 			free(worker);
 
 			return 1;
@@ -77,10 +93,16 @@ int threadPoolCreate(nThreadPool *workqueue, int numWorkers) {
 void threadPoolShutdown(nThreadPool *workqueue) 
 {
 	nWorker *worker = NULL;
+	nWorker *head = workqueue->workers;
+
 
 	for (worker = workqueue->workers;worker != NULL;worker = worker->next) {
 		worker->terminate = 1;
+		if(head == worker->next){
+			break;
+		}
 	}
+
 
 	pthread_mutex_lock(&workqueue->jobs_mtx);
 
@@ -93,15 +115,5 @@ void threadPoolShutdown(nThreadPool *workqueue)
 	
 }
 
-void threadPoolQueue(nThreadPool *workqueue, nJob *job) 
-{
 
-	pthread_mutex_lock(&workqueue->jobs_mtx);
-
-	LL_ADD(job, workqueue->waiting_jobs);
-	
-	pthread_cond_signal(&workqueue->jobs_cond);
-	pthread_mutex_unlock(&workqueue->jobs_mtx);
-	
-}
 

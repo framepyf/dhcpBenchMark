@@ -1,6 +1,8 @@
-#ifndef __DHCPV6_TOOL__
-#define __DHCPV6_TOOL__
+#ifndef __DHCPV6__
+#define __DHCPV6__
 
+#include <net/if.h>
+#include <arpa/inet.h>
 /* DHCPv6 Option codes: */
 
 #define D6O_CLIENTID				1 /* RFC3315 */
@@ -29,22 +31,7 @@
 #define D6O_DOMAIN_SEARCH			24 /* RFC3646 */
 #define D6O_IA_PD				25 /* RFC3633 */
 #define D6O_IAPREFIX				26 /* RFC3633 */
-#define D6O_NIS_SERVERS				27 /* RFC3898 */
-#define D6O_NISP_SERVERS			28 /* RFC3898 */
-#define D6O_NIS_DOMAIN_NAME			29 /* RFC3898 */
-#define D6O_NISP_DOMAIN_NAME			30 /* RFC3898 */
-#define D6O_SNTP_SERVERS			31 /* RFC4075 */
-#define D6O_INFORMATION_REFRESH_TIME		32 /* RFC4242 */
-#define D6O_BCMCS_SERVER_D			33 /* RFC4280 */
-#define D6O_BCMCS_SERVER_A			34 /* RFC4280 */
-/* 35 is unassigned */
-#define D6O_GEOCONF_CIVIC			36 /* RFC4776 */
-#define D6O_REMOTE_ID				37 /* RFC4649 */
-#define D6O_SUBSCRIBER_ID			38 /* RFC4580 */
-#define D6O_CLIENT_FQDN				39 /* RFC4704 */
-#define D6O_PANA_AGENT				40 /* paa-option */
-#define D6O_NEW_POSIX_TIMEZONE			41 /* RFC4833 */
-#define D6O_NEW_TZDB_TIMEZONE			42 /* RFC4833 */
+
 
 
 #define DHCPV6_SOLICIT		    1
@@ -73,7 +60,7 @@
 #define DHCPV6_RELAY_FORW	   12
 #define DHCPV6_RELAY_REPL	   13
 
-#define DEFAULT_PORT 546
+
 
 #define INIA_INFO_LEN      40
 #define IAADDR_INFO_LEN    24
@@ -85,47 +72,20 @@
 #define DHO_PAD					0
 
 
-#define ASYNC_CLIENT_NUM		1024
-
-typedef struct  dhcpv6_tool_para{
-	//char  dip[128] ;
-	struct in6_addr d_addr;
-	int  dport ;
-	struct in6_addr s_addr;
-	int  sport ;
-	unsigned char msgType ;
-	//char  reqIp[128] ;
-	struct in6_addr r_addr;
-	char  clinetDuid[128] ;
-	int  clinetIdLen ;
-	char  serverDuid[128] ;
-	int  serverIdLen ;
-	char optData[1024] ;
-	int  optLen ;
-	int threadNum ;
-	int reqCount ;
-	int speed ;
-	unsigned char transaction_id[3];
-}dhcpv6_tool_para_t;
-
-typedef struct async_context {
-	int epfd;
-}async_context_t;
 
 typedef struct dhcpv6_para {
+     struct in6_addr s_addr;
+	 int  sport ;
 	 unsigned char msg_type;
+     struct in6_addr r_addr;
      unsigned char transaction_id[3];
-	 unsigned char ipAddr[16];
 	 char  clinetDuid[128];
 	 int  clinetIdLen ;
+    char  serverDuid[128] ;
+	int  serverIdLen ;
+    char optData[1024] ;
+	int  optLen ;
 }dhcpv6_para_t;
-
-typedef void (*async_result_cb)(dhcpv6_para_t * dhcpv6Para);
-
-typedef struct ep_arg {
-	int sockfd;
-	async_result_cb cb;
-}ep_arg_t;
 
 
 
@@ -144,4 +104,8 @@ struct dhcpv6_packet {
 	unsigned char options[0];
 };
 
-#endif //__DHCPV6_TOOL__
+
+extern int build_request(char * buff,dhcpv6_para_t * dhcpv6Para);
+extern int build_dhcpv6_req(char * buff,dhcpv6_para_t * pPara);
+extern void *  dhcpv6_parse_cb(char * buffer, int buffLen);
+#endif //__DHCPV6__
