@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
-#include "include/log.h"
+#include "log.h"
 
 
 #define LL_ADD(item, list) do { 	\

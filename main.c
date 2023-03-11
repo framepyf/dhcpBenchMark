@@ -8,12 +8,12 @@
 #include <getopt.h>
 #include <time.h>
 #include <unistd.h>
-#include "include/threadPool.h"
-#include "include/log.h"
-#include "include/udp.h"
-#include "include/async.h"
-#include "include/util.h"
-#include "include/dhcpv6.h"
+#include "net/net.h"
+#include "threadPool.h"
+#include "log.h"
+#include "async.h"
+#include "util.h"
+#include "dhcpv6.h"
 
 typedef struct  dhcpv6_tool_para{
 	struct in6_addr d_addr;
@@ -27,8 +27,10 @@ typedef struct  dhcpv6_tool_para{
 
 
 int gSockFd = 0;
-nThreadPool gPool;
+nThreadPool gReqPool;
+nThreadPool gRspPool;
 dhcpv6_tool_para_t gPara;
+int gRawFlag = 0;
 
 
 
@@ -45,6 +47,7 @@ static struct option long_options[] = {
 	{"thread",	required_argument,	0,	'a'},
 	{"count",	required_argument,	0,	't'},
 	{"speed",	required_argument,	0,	'e'},
+	{"raw",	no_argument,	0,	'w'},
 	{"dbglevel",	required_argument,	0,	'l'},
 	{"--help",	no_argument,	0,	'h'},
 	{0,		0,			0,	0}
@@ -67,6 +70,7 @@ static void usage(char * pName)
 	DHCP_LOG_SHOW(" \t-a, --thread    use thread num , for example:10");
 	DHCP_LOG_SHOW(" \t-t, --count  send request num, for example:10000000");
 	DHCP_LOG_SHOW(" \t-e, --speed  thread packet sending rate, for example:10000");
+	DHCP_LOG_SHOW(" \t-w, --raw    Send packets using the original socket");
 	DHCP_LOG_SHOW(" \t-l, --dbglevel  debug level, for example: 0(DEBUG) 1(INFO), 2(WARN), 3(STATS), 4(SHOW),5(ERROR) default: INFO");
     DHCP_LOG_SHOW(" \t-h, --help          Display this help and exit\n");
 	DHCP_LOG_SHOW("for example:");
@@ -97,7 +101,7 @@ void sendSpecReqCb(nJob *job)
 
 	buffLen = build_dhcpv6_req(buff,&gPara.dhcpPara);
 
-	if( sendReqToServer(gSockFd,&gPara.d_addr,gPara.dport,buff,buffLen) < 0 ){
+	if( sendSpecPktToServer(gRawFlag,gSockFd,&gPara.d_addr,gPara.dport,buff,buffLen) < 0 ){
 		 DHCP_LOG_ERROR("send request error: %s",strerror(errno));
 	}
 
@@ -129,14 +133,12 @@ void sendDhcpv6Req(nJob *job)
 	if(dhcpv6Para->msg_type == DHCPV6_ADVERTISE){
 		/*参数copy*/
 		memcpy(&dhcpv6Para->s_addr,&gPara.dhcpPara.s_addr,sizeof(gPara.dhcpPara.s_addr));
-		memcpy(dhcpv6Para->serverDuid,gPara.dhcpPara.serverDuid,gPara.dhcpPara.serverIdLen);
-		dhcpv6Para->serverIdLen = gPara.dhcpPara.serverIdLen;
 		memcpy(dhcpv6Para->optData,gPara.dhcpPara.optData,gPara.dhcpPara.optLen);
 		dhcpv6Para->optLen  = gPara.dhcpPara.optLen;
 
 		buffLen = build_request(buff,dhcpv6Para);
 
-		if(sendReqToServer(gSockFd,&gPara.d_addr,gPara.dport,buff,buffLen) < 0){
+		if(sendSpecPktToServer(gRawFlag,gSockFd,&gPara.d_addr,gPara.dport,buff,buffLen) < 0){
 			DHCP_LOG_ERROR("send request error: %s",strerror(errno));
 		}
 	}
@@ -158,7 +160,7 @@ void async_result_proc_cb(void * para)
 	job->job_function = sendDhcpv6Req;
 	job->user_data = para;
 
-	threadPoolQueue(&gPool, job);
+	threadPoolQueue(&gRspPool, job);
 }
 
 
@@ -176,24 +178,22 @@ int createTask(int reqCount,task_cb cb)
 		job->job_function = cb;
 		job->user_data = NULL;
 
-
-		threadPoolQueue(&gPool, job);
+        
+		threadPoolQueue(&gReqPool, job);
 
 	}
 }
 
 int main(int argc, char **argv)
 {
-
-	char buff[1024] = {0};
 	int ret = 0;
-	int totalLen = 0;
 	int  index         = 0;
 	int serFlag = 0;
+	int i = 0;
 
 	optind = 1;
 
-	while(-1 != ( ret = getopt_long(argc, argv, "d:p:b:r:m:i:c:s:o:a:t:l:h", long_options, &index)) ){
+	while(-1 != ( ret = getopt_long(argc, argv, "d:p:b:r:m:i:c:s:o:a:t:e:wl:h", long_options, &index)) ){
 		switch(ret){
 			case 'd':
 				if(1 != inet_pton(AF_INET6, optarg, (void*)&gPara.d_addr)){
@@ -244,6 +244,9 @@ int main(int argc, char **argv)
 			case  'l':
 			      dhcpSetDebugLevel(atoi(optarg));
                   break;
+			case  'w':
+			      gRawFlag  = 1; 
+                  break;
 			case  'h':    
 			default:
 				usage(argv[0]);
@@ -253,32 +256,40 @@ int main(int argc, char **argv)
 
 	}
 
-	if(argc < 5 || gPara.dhcpPara.serverIdLen == 0 || gPara.dport == 0 || serFlag == 0){
+	if(argc < 5 || (gPara.dhcpPara.msg_type != DHCPV6_SOLICIT  && gPara.dhcpPara.serverIdLen == 0) || gPara.dport == 0 || serFlag == 0){
 		usage(argv[0]);
 		exit(0);
 	}
 
-	gSockFd = createUdp6Socket(&gPara.dhcpPara.s_addr,gPara.dhcpPara.sport);
+
+	gSockFd = createSpecSocket(gRawFlag,&gPara.dhcpPara.s_addr,gPara.dhcpPara.sport);
 	if(gSockFd < 0){
-		DHCP_LOG_ERROR("create sockt error %s",strerror(errno));
 		return -1;
 	}
 
-	//创建线程池
-	if( 0 != threadPoolCreate(&gPool, gPara.threadNum)){
-		 DHCP_LOG_ERROR("thread pool created failed");
-		 return -1;
-	}
+		//创建线程池
+		if( 0 != threadPoolCreate(&gReqPool, gPara.threadNum)){
+			DHCP_LOG_ERROR("thread pool created failed");
+			return -1;
+		}
+
+		//创建线程池
+		if( 0 != threadPoolCreate(&gRspPool, gPara.threadNum)){
+			DHCP_LOG_ERROR("thread pool created failed");
+			return -1;
+		}
 
 
-	async_task_init(gSockFd,async_result_proc_cb,dhcpv6_parse_cb);
+		async_task_init(gSockFd,async_result_proc_cb,dhcpv6_parse_cb);
 
-	createTask(gPara.reqCount,sendSpecReqCb);
+		createTask(gPara.reqCount,sendSpecReqCb);
+		DHCP_LOG_INFO("press any key to exit");
+		getchar();
+		DHCP_LOG_INFO("end");
+		threadPoolShutdown(&gReqPool);
+		threadPoolShutdown(&gRspPool);
 
-    DHCP_LOG_INFO("press any key to exit");
-	getchar();
-	DHCP_LOG_INFO("end");
-	threadPoolShutdown(&gPool);
+
 	close(gSockFd);
 
 	return 0;

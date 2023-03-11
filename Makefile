@@ -11,9 +11,9 @@ SRC += $(wildcard ./async/*.c)
 SRC += $(wildcard ./util/*.c)
 SRC += $(wildcard ./log/*.c)
 OBJECTS = $(patsubst %.c,%.o,$(notdir $(SRC)))
-CFLAGS  =  -I./  -g
+CFLAGS  =  -I./include/  -g
 LDFLAGS = -lpthread
-STATIC  = -static
+STATIC  = #-static
 	
 all: $(TARGET)
 $(OBJECTS):$(SRC)

@@ -1,7 +1,7 @@
 #include <time.h>
 #include <stdlib.h>
-#include "include/log.h"
-#include "include/dhcpv6.h"
+#include "log.h"
+#include "dhcpv6.h"
 
 int  gAckCount = 0;
 
@@ -169,6 +169,13 @@ dhcpv6_para_t * parse_option_buffer (unsigned char *optBuff,unsigned len,unsigne
 				flag |= 2;
 			    dhcpDebugPrintHex("client duid:",dhcpv6Para->clinetDuid,dhcpv6Para->clinetIdLen);
 				break;
+			case D6O_SERVERID:
+				dhcpv6Para->serverIdLen = ntohs(*(unsigned short *)(optBuff + offset));
+				val = optBuff + offset + sizeof(unsigned short);
+				memcpy(dhcpv6Para->serverDuid,val,dhcpv6Para->serverIdLen);
+				flag |= 4;
+			    dhcpDebugPrintHex("server duid:",dhcpv6Para->serverDuid,dhcpv6Para->serverIdLen);
+				break;
 			case D6O_IA_NA:
 				offset += 14; //skip 
 				continue;
@@ -177,7 +184,7 @@ dhcpv6_para_t * parse_option_buffer (unsigned char *optBuff,unsigned len,unsigne
 				val = optBuff + offset + sizeof(unsigned short);
 				memcpy(&dhcpv6Para->r_addr,val,sizeof(dhcpv6Para->r_addr));
 				dhcpDebugPrintHex("ip addr:",(const unsigned char *)&dhcpv6Para->r_addr,sizeof(dhcpv6Para->r_addr));
-				flag |= 4;
+				flag |= 8;
 				break;
 			default:
 				break;
@@ -185,14 +192,14 @@ dhcpv6_para_t * parse_option_buffer (unsigned char *optBuff,unsigned len,unsigne
 		}
 
 		offset  += (ntohs(*(unsigned short *)(optBuff + offset)) + sizeof(unsigned short));//skip LV
-		if((flag & 0x7) == 0x7){
+		if((flag & 0xf) == 0xf){
 			break;
 		}
 	}
 
- 
+    DHCP_LOG_DEBUG("flag:%d",flag);
 out:
-    if((flag & 0x7) != 0x7){
+    if((flag & 0xf) != 0xf){
          if(dhcpv6Para){
             free(dhcpv6Para);
             dhcpv6Para = NULL;

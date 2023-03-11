@@ -1,6 +1,6 @@
 
-#include "include/threadPool.h"
-#include "include/log.h"
+#include "threadPool.h"
+#include "log.h"
 
 
 void threadPoolQueue(nThreadPool *workqueue, nJob *job) 
@@ -14,8 +14,6 @@ void threadPoolQueue(nThreadPool *workqueue, nJob *job)
 	pthread_mutex_unlock(&workqueue->jobs_mtx);
 	
 }
-
-
 
 
 static void * workerThread(void *ptr) {

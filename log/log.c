@@ -1,5 +1,5 @@
 
-#include "include/log.h"
+#include "log.h"
 
 #define DHCP_STREAM_TYPE (stdout)
 #define DHCP_STREAM_COLOR_STATE (1)
