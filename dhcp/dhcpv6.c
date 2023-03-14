@@ -221,7 +221,7 @@ int build_dhcpv6_req(char * buff,dhcpv6_para_t * pPara)
 	 int  clinetIdLen  = 0;
 
 
-	relayHeaderLen  = build_relay_msg_header(buff,&pPara->s_addr,&pLen);
+	relayHeaderLen  = build_relay_msg_header(buff,&pPara->l_addr,&pLen);
 	totalLen += relayHeaderLen;
 
 	totalLen += build_dhcpv6_packet_header(buff + totalLen,pPara->msg_type,pPara->transaction_id);

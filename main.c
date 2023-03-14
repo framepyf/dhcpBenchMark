@@ -39,6 +39,7 @@ static struct option long_options[] = {
 	{"dport",	required_argument,		0,	'p'},
 	{"sip",		required_argument,	0,	'b'},
 	{"sport",	required_argument,		0,	'r'},
+	{"linkaddr",		required_argument,	0,	'k'},
 	{"msg_type",	required_argument, 	0,	'm'},
 	{"ipv6_address",	required_argument,		0,	'i'},
 	{"client_duid",	required_argument,	0,	'c'},
@@ -62,6 +63,7 @@ static void usage(char * pName)
     DHCP_LOG_SHOW(" \t-p, --dport         dhcp server port,for example:547");
     DHCP_LOG_SHOW(" \t-b, --sip           tool host ip, for example:2001::80");
     DHCP_LOG_SHOW(" \t-r, --sport         tool host port , for example:547\n");
+	DHCP_LOG_SHOW(" \t-k, --linkaddr      link addr , for example:2001::1\n");
     DHCP_LOG_SHOW(" \t-m, --msg_type      send request type , for example: 1 (socilit) 3(request)");
 	DHCP_LOG_SHOW(" \t-i, --ipv6_address  request ip addr, for example:2001::5\n");
 	DHCP_LOG_SHOW(" \t-c, --client_duid   client duid , for example:00010001234ecc25005056b1703c");
@@ -75,8 +77,8 @@ static void usage(char * pName)
     DHCP_LOG_SHOW(" \t-h, --help          Display this help and exit\n");
 	DHCP_LOG_SHOW("for example:");
 	DHCP_LOG_SHOW("  %s --dip 2001::1  --dport 547 --sport 547 --sip 2001::79 --msg_type 3  --ipv6_address 2001::b  --client_duid 00010001234ecc25005056b1703c"
-	             "--server_duid 000100012a3f0e760050568de3bc  --option 000600020011",pName);
-	DHCP_LOG_SHOW("  %s --dip 2001::1  --dport 547 --sport 547 --sip 2001::79  --msg_type 1  --server_duid 000100012a3f0e760050568de3bc  --thread 5 --count 10000 --speed 1000",pName);
+	             " --server_duid 000100012a3f0e760050568de3bc  --option 000600020011",pName);
+	DHCP_LOG_SHOW("  %s --dip 2001::1  --dport 547 --sport 547 --sip 2001::79  --msg_type 1   --thread 5 --count 10000 --speed 1000",pName);
 }
 
 
@@ -133,6 +135,7 @@ void sendDhcpv6Req(nJob *job)
 	if(dhcpv6Para->msg_type == DHCPV6_ADVERTISE){
 		/*参数copy*/
 		memcpy(&dhcpv6Para->s_addr,&gPara.dhcpPara.s_addr,sizeof(gPara.dhcpPara.s_addr));
+		memcpy(&dhcpv6Para->l_addr,&gPara.dhcpPara.l_addr,sizeof(gPara.dhcpPara.l_addr));
 		memcpy(dhcpv6Para->optData,gPara.dhcpPara.optData,gPara.dhcpPara.optLen);
 		dhcpv6Para->optLen  = gPara.dhcpPara.optLen;
 
@@ -188,7 +191,7 @@ int main(int argc, char **argv)
 {
 	int ret = 0;
 	int  index         = 0;
-	int serFlag = 0;
+	int flag = 0;
 	int i = 0;
 
 	optind = 1;
@@ -200,7 +203,7 @@ int main(int argc, char **argv)
 					DHCP_LOG_ERROR("para --dip %s error",optarg);
 					exit(errno);
 				}
-				serFlag = 1;
+				flag |= 1;
 				break;
 			case 'p':
 				gPara.dport = atoi(optarg);
@@ -210,6 +213,13 @@ int main(int argc, char **argv)
 					DHCP_LOG_ERROR("para --sip %s error",optarg);
 					exit(errno);
 				}
+				break;
+			case 'k':
+				if(1 != inet_pton(AF_INET6, optarg, (void*)&gPara.dhcpPara.l_addr)){
+					DHCP_LOG_ERROR("para --linkaddr %s error",optarg);
+					exit(errno);
+				}
+				flag |= 2;
 				break;
 			case 'r':
 				gPara.dhcpPara.sport = atoi(optarg);
@@ -256,9 +266,14 @@ int main(int argc, char **argv)
 
 	}
 
-	if(argc < 5 || (gPara.dhcpPara.msg_type != DHCPV6_SOLICIT  && gPara.dhcpPara.serverIdLen == 0) || gPara.dport == 0 || serFlag == 0){
+	if(argc < 5 || (gPara.dhcpPara.msg_type != DHCPV6_SOLICIT  && gPara.dhcpPara.serverIdLen == 0) || gPara.dport == 0 || (flag &(1<<0)) == 0){
 		usage(argv[0]);
 		exit(0);
+	}
+
+     // link addr 
+	if((flag & (1<<1)) == 0){
+		memcpy(&gPara.dhcpPara.l_addr,&gPara.dhcpPara.s_addr,sizeof(gPara.dhcpPara.s_addr));
 	}
 
 

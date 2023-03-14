@@ -13,7 +13,7 @@ SRC += $(wildcard ./log/*.c)
 OBJECTS = $(patsubst %.c,%.o,$(notdir $(SRC)))
 CFLAGS  =  -I./include/  -g
 LDFLAGS = -lpthread
-STATIC  = #-static
+STATIC  = -static
 	
 all: $(TARGET)
 $(OBJECTS):$(SRC)

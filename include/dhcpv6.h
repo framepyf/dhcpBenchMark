@@ -77,6 +77,7 @@ typedef struct dhcpv6_para {
      struct in6_addr s_addr;
 	 int  sport ;
 	 unsigned char msg_type;
+	 struct in6_addr l_addr;
      struct in6_addr r_addr;
      unsigned char transaction_id[3];
 	 char  clinetDuid[128];
